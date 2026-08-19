@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.pt
+*.pth
+wandb/
+.ipynb_checkpoints/
+shared/data/raw/
+*Zone.Identifier
+*:Zone.Identifier
+shared/data/processed/
+teste-smrl/
+*.pdf

@@ -1,0 +1,56 @@
+experiment:
+  name: "attention_v1"
+  seed: 42
+
+model:
+  type: &model_type "gpt2"   # [ "gpt2", "proposed"]
+  p: 4
+  hidden_size: 256
+  d_ff: 682
+  vocab_size : 32768
+  max_seq_length : &max_seq_len 256
+  n_layer : 12
+  n_head : 8  
+  dropout : 0.1  
+
+training:
+  max_steps: 5000
+  batch_size: 8
+  lr: 1.0e-4
+  lr_min: 1.0e-5
+  weight_decay : 0.01
+  warm_up_steps : 250
+  gradient_clip_val: 0.5
+  early_stopping:
+    monitor: val_ppl
+    mode: min
+    patience: 5
+    min_delta: 0.0
+    stopping_threshold: 40.0
+
+batching:
+  train_batch_size : 1
+  eval_batch_size : 4
+
+logging:
+  logging_steps : 50
+  save_steps : 1000
+  eval_steps : 2500
+  limit_val_batches : 200
+
+evaluation:
+  metrics: ["accuracy", "f1"]
+
+data:
+  model_name_for_tokenizer : "gpt2"
+  dataset_name : "tinystoriesv2-gpt4"
+  output_raw_dir : "shared/data/raw/tinystoriesv2-gpt4"
+  num_workers : 0
+  output_processed_dir : "shared/data/processed/tinystoriesv2-gpt4"
+  tokenized_dataset_path:
+    train_dataset_path : "shared/data/processed/tinystoriesv2-gpt4/32768_hf/TinyStoriesV2-GPT4-train.npy"
+    valid_dataset_path : "shared/data/processed/tinystoriesv2-gpt4/32768_hf/TinyStoriesV2-GPT4-validation.npy"
+    test_dataset_path  : "shared/data/processed/tinystoriesv2-gpt4/32768_hf/TinyStoriesV2-GPT4-test.npy"
+
+paths:
+  results_dir: "results/smrl/"
