@@ -12,3 +12,5 @@ shared/data/raw/
 shared/data/processed/
 teste-smrl/
 *.pdf
+*.npy
+*.ipynb

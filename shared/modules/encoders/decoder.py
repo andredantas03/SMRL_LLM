@@ -4,8 +4,9 @@ import torch.nn as nn
 from shared.modules.positional_encoders.sliceawarepositionalencoding import SliceAwarePositionalEncoding
 from shared.modules.transformers_blocks.smrl_transformer_block import SMRLTransformerBlock
 from shared.tools.functions.dcttransform import DCTTransform
+import lightning as L
 
-class SMRLTransformerDecoder(nn.Module):
+class SMRLTransformerDecoder(L.LightningModule):
     """
     A full Stack of N SMRL Transformer Encoder Layers (Definition 5.10).
     """

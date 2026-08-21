@@ -5,11 +5,11 @@ experiment:
 model:
   type: &model_type "gpt2"   # [ "gpt2", "proposed"]
   p: 4
-  hidden_size: 256
-  d_ff: 682
-  vocab_size : 32768
-  max_seq_length : &max_seq_len 256
-  n_layer : 12
+  hidden_size: 128
+  d_ff: 512
+  vocab_size : 30000
+  max_seq_length : &max_seq_len 128
+  n_layer : 4
   n_head : 8  
   dropout : 0.1  
 
