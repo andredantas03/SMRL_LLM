@@ -3,15 +3,16 @@ import torch
 import torch.nn as nn
 from shared.modules.positional_encoders.sliceawarepositionalencoding import SliceAwarePositionalEncoding
 from shared.modules.transformers_blocks.smrl_transformer_block import SMRLTransformerBlock
-from shared.tools.functions.dcttransform import DCTTransform
+from shared.tools.functions.orthogonaltransform import OrthogonalTransform
 import lightning as L
+
 
 class SMRLTransformerDecoder(L.LightningModule):
     """
     A full Stack of N SMRL Transformer Encoder Layers (Definition 5.10).
     """
-    def __init__(self, num_layers, d, p, h, d_ff, vocab_size, T_max, 
-                 pe_strategy="linear", activation="relu", norm_first=False, causal=False):
+    def __init__(self, num_layers, d, p, h, d_ff, vocab_size, T_max, causal, kind,
+                 pe_strategy="linear", activation="relu", norm_first=False, ):
         super().__init__()
         self.d = d
         self.p = p
@@ -19,8 +20,7 @@ class SMRLTransformerDecoder(L.LightningModule):
         self.d_s = d // p
         self.vocab_size = vocab_size
 
-        Z = DCTTransform.get_matrix(self.p, dtype=torch.float32, kind='haar')  # ou o kind do config
-        self.register_buffer("Z", Z)
+        self.orthogonal_transform = OrthogonalTransform(p,kind)
 
         # Word embeddings in standard 2D space
         self.token_embeddings = nn.Embedding(vocab_size, d)
@@ -51,8 +51,9 @@ class SMRLTransformerDecoder(L.LightningModule):
         P = self.positional_encoding(B, s, device)
         X = X + P
         # 4. Forward pass through N sequential tensor encoder blocks
+        Z = self.orthogonal_transform.get_matrix(dtype=torch.float32)
         for layer in self.layers:
-            X = layer(X, None, self.Z)
+            X = layer(X, None, Z)
 
         # 5. Reconstruct standard representations: (B, s, d)
         return self.tensorizer.matp(X)

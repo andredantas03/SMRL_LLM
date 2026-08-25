@@ -11,9 +11,9 @@ from shared.tools.utils.sweep import apply_overrides
 
 
 PARAMETERS = {
-    "model.type": ["SMRL", "BertTiny"],
+    "model.type": ["SMRL"],
     "experiment.seed": [42, 123, 7],
-    "model.kind": ['dct', 'dst', 'haar', 'dht']
+    "model.kind": ['dct', 'dst', 'haar', 'dht', 'identity', 'learnable']
 }
 
 
@@ -33,6 +33,7 @@ def main() -> None:
 
     keys = list(PARAMETERS)
     for combo in itertools.product(*(PARAMETERS[k] for k in keys)):
+        print('Configuration: ', "_".join(f"{key.split('.')[-1]}={value}" for key, value in combo))
         overrides = dict(zip(keys, combo))
         config = apply_overrides(base_config, overrides)
         config["experiment"]["name"] = "_".join(

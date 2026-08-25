@@ -22,10 +22,12 @@ def resolve_tags_name(config):
         f"n_layer_{config['model']['n_layer']}",
         f"p_{config['model']['p']}",
         f"max_seq_length_{config['model']['max_seq_length']}",
+        f"kind_{config['model']['kind']}",
+        f"experiment_{config['experiment']['name']}",
     ]
 
 def resolve_project_name(config):
     return "SMRL"
 
 def resolve_run_name(config):
-    return "SMRL"
+    return "SMRL-"+config["model"]["kind"]

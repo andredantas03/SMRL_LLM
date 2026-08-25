@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import math
-from shared.tools.functions.dcttransform import DCTTransform
+from shared.tools.functions.orthogonaltransform import OrthogonalTransform
 
 class SMRLFFN(nn.Module):
     """
@@ -38,7 +38,7 @@ class SMRLFFN(nn.Module):
 
     def forward(self, X, Z):
         # 1. Transform activations to spectral domain: (B, T, ds, p)
-        X_hat = DCTTransform.forward(X, Z)
+        X_hat = OrthogonalTransform.forward(X, Z)
 
         # 2. Reshape to treat slice mode as batch: (B, p, T, ds)
         X_hat_sliced = X_hat.permute(0, 3, 1, 2)
@@ -56,4 +56,4 @@ class SMRLFFN(nn.Module):
 
         # 6. Permute back and transform to original domain
         Y_hat = Y_hat_sliced.permute(0, 2, 3, 1).contiguous()
-        return DCTTransform.inverse(Y_hat, Z)
+        return OrthogonalTransform.inverse(Y_hat, Z)

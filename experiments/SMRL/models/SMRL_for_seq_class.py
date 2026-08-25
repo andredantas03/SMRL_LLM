@@ -1,3 +1,4 @@
+import torch
 from shared.modules.encoders.encoder import SMRLTransformerEncoder
 import torch.nn as nn
 
@@ -57,6 +58,18 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
         return self._shared_step(batch, "val")
     def test_step(self, batch, batch_idx=None):
         return self._shared_step(batch, "test")
+    
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure=None):
+        optimizer.step(closure=optimizer_closure)   
+        
+        if self.config["model"]["kind"] == "learnable":
+            z = self.encoder.orthogonal_transform.learnable_z.z
+            with torch.no_grad():
+                zf = z.float()
+                Q, R = torch.linalg.qr(zf)
+                s = torch.sign(torch.diag(R))
+                s = torch.where(s == 0, torch.ones_like(s), s)
+                z.copy_(Q * s.unsqueeze(0))
     
     def configure_optimizers(self):
         return build_optimizer_and_scheduler(self, self.config)

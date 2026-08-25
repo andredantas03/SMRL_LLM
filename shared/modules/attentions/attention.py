@@ -1,5 +1,5 @@
 import math
-from shared.tools.functions.dcttransform import DCTTransform
+from shared.tools.functions.orthogonaltransform import OrthogonalTransform
 from torch import nn, Tensor
 from einops import einsum, rearrange
 import torch
@@ -37,7 +37,7 @@ class SMRL_Attention(nn.Module):
 
     def forward(self, X_pos, Z, attention_mask=None):
         # 1. Transform input activations to DCT domain: (B, s, ds, p)
-        X_hat = DCTTransform.forward(X_pos, Z)
+        X_hat = OrthogonalTransform.forward(X_pos, Z)
 
         # 2. Treat slice index as a batch dimension for GPU concurrency:
         # Permute (B, s, ds, p) -> (B, p, s, ds)
@@ -90,7 +90,7 @@ class SMRL_Attention(nn.Module):
         Y_hat = rearrange(Y_hat_sliced, "b p s ds -> b s ds p")
 
         # 10. Map back using inverse L-transform
-        Y = DCTTransform.inverse(Y_hat, Z)
+        Y = OrthogonalTransform.inverse(Y_hat, Z)
         return Y
 
 
