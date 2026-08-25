@@ -195,6 +195,100 @@ def build_dataloaders(
 
     return dataloaders
 
+def _classification_split_paths(processed_dataset_path, split: str):
+    prefix = processed_dataset_path.get(f"{split}_prefix")
+    if prefix:
+        return f"{prefix}-docs.npy", f"{prefix}-offsets.npy", f"{prefix}-labels.npy"
+    docs = processed_dataset_path.get(f"{split}_docs_path")
+    offsets = processed_dataset_path.get(f"{split}_offsets_path")
+    labels = processed_dataset_path.get(f"{split}_labels_path")
+    if docs and offsets and labels:
+        return docs, offsets, labels
+    return None
+
+def build_classification_dataloaders(
+    processed_dataset_path,
+    context_length,
+    batch_size: int,
+    shuffle_train: bool = True,
+    eval_batch_size: int | None = None,
+    pad_id: int = 0,
+    num_workers: int = 0,
+    pin_memory: bool = False,
+):
+    eval_bs = eval_batch_size if eval_batch_size is not None else batch_size
+    
+    dataloaders = {}
+
+    for split, bs, shuffle in (
+        ("train", batch_size, shuffle_train),
+        ("valid", eval_bs, False),
+        ("test", eval_bs, False),
+    ):
+        paths = _classification_split_paths(processed_dataset_path, split)
+        print(paths)
+        if paths is None:
+            continue
+        docs_path, offsets_path, labels_path = paths
+        dataset = ClassificationDataset(
+            docs_path=docs_path,
+            offsets_path=offsets_path,
+            labels_path=labels_path,
+            max_length=context_length,
+            pad_id=pad_id,
+        )
+        dataloaders[split] = DataLoader(
+            dataset,
+            batch_size=bs,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=num_workers > 0,
+            drop_last=False,
+        )
+    return dataloaders
+
+
+
+
+
+
+
+
+class ClassificationDataset(Dataset):
+    def __init__(self, docs_path, offsets_path, labels_path, max_length, pad_id=0):
+        self.docs = np.load(docs_path, mmap_mode="r")
+        self.offsets = np.load(offsets_path)
+        self.labels = np.load(labels_path)
+        self.max_length = max_length
+        self.pad_id = pad_id
+        if len(self.offsets) != len(self.labels) + 1:
+            raise ValueError(
+                f"offsets length {len(self.offsets)} != n_labels+1 ({len(self.labels) + 1})"
+            )
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        start = int(self.offsets[idx])
+        end = int(self.offsets[idx + 1])
+        ids = np.asarray(self.docs[start:end], dtype=np.int64)
+
+        if ids.size > self.max_length:
+            ids = ids[: self.max_length]
+
+        n = int(ids.size)
+        padded = np.full(self.max_length, self.pad_id, dtype=np.int64)
+        attn = np.zeros(self.max_length, dtype=np.int64)
+        padded[:n] = ids
+        attn[:n] = 1
+
+        return {
+            "input_ids": torch.from_numpy(padded),
+            "attention_mask": torch.from_numpy(attn),
+            "labels": torch.tensor(int(self.labels[idx]), dtype=torch.long),
+        }
 
 
 class LMDataset(Dataset):

@@ -8,11 +8,12 @@ class SMRLFFN(nn.Module):
     Implements L-Feed-Forward Network (Definition 5.5 / Theorem 5.6).
     Applies standard FFNs independently to each transform-domain slice.
     """
-    def __init__(self, ds, d_ff_s, p, activation="relu"):
+    def __init__(self, ds, d_ff_s, p, activation="relu", dropout=0.1):
         super().__init__()
         self.ds = ds
         self.d_ff_s = d_ff_s
         self.p = p
+        self.drop = nn.Dropout(dropout)
 
         # Transform-domain weight parameter tensors
         self.W1 = nn.Parameter(torch.empty(p, ds, d_ff_s))
@@ -48,7 +49,7 @@ class SMRLFFN(nn.Module):
 
         # 4. Element-wise non-linearity
         G = self.act(H)
-
+        G = self.drop(G)
         # 5. Apply second linear layer: Y = G * W2 + b2
         # unsqueeze(0) transforms (p, 1, ds) to (1, p, 1, ds) to broadcast over Batch size B
         Y_hat_sliced = torch.einsum('b p t f, p f s -> b p t s', G, self.W2) + self.b2.unsqueeze(0)

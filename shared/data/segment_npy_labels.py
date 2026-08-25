@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -53,6 +54,11 @@ def collect_labels(
     for example in dataset:
         text = example[text_column]
         if text is None or not str(text).strip():
+            skipped += 1
+            continue
+        text = re.sub(r"<br\s*/?>", " ", str(text), flags=re.I)
+        text = " ".join(text.split())
+        if not text:
             skipped += 1
             continue
         labels.append(int(example[label_column]))

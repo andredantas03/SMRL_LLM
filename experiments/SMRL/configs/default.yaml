@@ -3,24 +3,27 @@ experiment:
   seed: 42
 
 model:
-  type: &model_type "gpt2"   # [ "gpt2", "proposed"]
+  #type: 'SMRL_for_Sequence_Classification'
+  type: 'SMRL'
   p: 4
   hidden_size: 128
   d_ff: 512
   vocab_size : 30000
   max_seq_length : &max_seq_len 128
-  n_layer : 4
-  n_head : 8  
+  n_layer : 5
+  n_head : 1
+  H: 4
   dropout : 0.1  
+  kind: 'dct' # ['dct', 'dst', 'haar', 'dht']
 
 training:
   max_steps: 5000
   batch_size: 8
-  lr: 1.0e-4
+  lr: 3.0e-4
   lr_min: 1.0e-5
   weight_decay : 0.01
   warm_up_steps : 250
-  gradient_clip_val: 0.5
+  gradient_clip_val: 1.0
   early_stopping:
     monitor: val_ppl
     mode: min
@@ -28,9 +31,11 @@ training:
     min_delta: 0.0
     stopping_threshold: 40.0
 
-batching:
-  train_batch_size : 1
-  eval_batch_size : 4
+training_classification:
+  max_epochs: 20
+  batch_size: 128
+
+
 
 logging:
   logging_steps : 50
@@ -42,15 +47,31 @@ evaluation:
   metrics: ["accuracy", "f1"]
 
 data:
-  model_name_for_tokenizer : "gpt2"
-  dataset_name : "tinystoriesv2-gpt4"
-  output_raw_dir : "shared/data/raw/tinystoriesv2-gpt4"
+  #dataset_name : "tinystoriesv2-gpt4"
+  dataset_name : "wikitext103"
+  output_raw_dir : "shared/data/raw/wikitext103"
+  #output_raw_dir : "shared/data/raw/tinystoriesv2-gpt4"
   num_workers : 0
-  output_processed_dir : "shared/data/processed/tinystoriesv2-gpt4"
+  output_processed_dir : "shared/data/processed/wikitext103"
+  #output_processed_dir : "shared/data/processed/tinystoriesv2-gpt4"
   tokenized_dataset_path:
-    train_dataset_path : "shared/data/processed/tinystoriesv2-gpt4/32768_hf/TinyStoriesV2-GPT4-train.npy"
-    valid_dataset_path : "shared/data/processed/tinystoriesv2-gpt4/32768_hf/TinyStoriesV2-GPT4-validation.npy"
-    test_dataset_path  : "shared/data/processed/tinystoriesv2-gpt4/32768_hf/TinyStoriesV2-GPT4-test.npy"
+    train_dataset_path : "shared/data/processed/wikitext103/30000_hf/wikitext103-train.npy"
+    valid_dataset_path : "shared/data/processed/wikitext103/30000_hf/wikitext103-validation.npy"
+    test_dataset_path  : "shared/data/processed/wikitext103/30000_hf/wikitext103-test.npy"
+#    train_dataset_path : "shared/data/processed/tinystoriesv2-gpt4/30000_hf/TinyStoriesV2-GPT4-train.npy"
+#    valid_dataset_path : "shared/data/processed/tinystoriesv2-gpt4/30000_hf/TinyStoriesV2-GPT4-validation.npy"
+#    test_dataset_path  : "shared/data/processed/tinystoriesv2-gpt4/30000_hf/TinyStoriesV2-GPT4-test.npy"
 
+data_classification:
+  processed_dataset_path:
+    train_docs_path: "shared/data/processed/imdb/30000_sennrich/imdb-train-docs.npy"
+    train_offsets_path: "shared/data/processed/imdb/30000_sennrich/imdb-train-offsets.npy"
+    train_labels_path: "shared/data/processed/imdb/30000_sennrich/imdb-train-labels.npy"
+    test_docs_path: "shared/data/processed/imdb/30000_sennrich/imdb-test-docs.npy"
+    test_offsets_path: "shared/data/processed/imdb/30000_sennrich/imdb-test-offsets.npy"
+    test_labels_path: "shared/data/processed/imdb/30000_sennrich/imdb-test-labels.npy"
+ 
+  num_classes: 2
+  pad_id: 0
 paths:
   results_dir: "results/smrl/"

@@ -5,6 +5,26 @@ import torch
 from torch.nn import Parameter
 import math
 
+class PositionwiseFFN(nn.Module):
+    """Standard Transformer FFN: Linear → GELU → Linear, width 4d unless overridden."""
+
+    def __init__(self, d_model, d_ff=None, dropout=0.0, activation="gelu"):
+        super().__init__()
+        d_ff = d_ff if d_ff is not None else 4 * d_model
+        self.fc1 = nn.Linear(d_model, d_ff)
+        self.fc2 = nn.Linear(d_ff, d_model)
+        self.drop = nn.Dropout(dropout)
+        if activation == "relu":
+            self.act = torch.relu
+        elif activation == "gelu":
+            self.act = nn.functional.gelu
+        else:
+            raise ValueError(f"Unsupported activation: {activation}")
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.fc2(self.drop(self.act(self.fc1(x))))
+
+
 class SwiGLU(nn.Module):
     def __init__(self, d_model, d_ff=None, device=None, dtype=None, *args, **kwargs):
         super().__init__(*args, **kwargs)

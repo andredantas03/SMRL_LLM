@@ -26,9 +26,9 @@ from tokenizers import Regex, Tokenizer, decoders, models, pre_tokenizers, train
 GPT2_PRETOKENIZER_REGEX = (
     r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"
 )
-DEFAULT_RAW_DIR = "shared/data/raw/wikitext103"
-DEFAULT_SPECIAL_TOKENS = ["<|endoftext|>"]
-DEFAULT_DATASET_NAME = "wikitext103"
+DEFAULT_RAW_DIR = "shared/data/raw/imdb"
+DEFAULT_SPECIAL_TOKENS = ["[PAD]", "[UNK]", "<|endoftext|>"]
+DEFAULT_DATASET_NAME = "imdb"
 DEFAULT_VOCAB_SIZE = 30000
 ENCODE_BATCH_LINES = 256
 NPY_WRITE_CHUNK_TOKENS = 4_000_000
@@ -64,6 +64,24 @@ def build_bytelevel_bpe_tokenizer(
     )
     return tokenizer, trainer
 
+def build_bytelevel_bpe_tokenizer2(
+    vocab_size: int,
+    special_tokens: list[str],
+) -> tuple[Tokenizer, trainers.BpeTrainer]:
+    tokenizer = Tokenizer(models.BPE(unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
+        [
+            pre_tokenizers.Whitespace(),
+            pre_tokenizers.Punctuation(),
+        ]
+    )
+    trainer = trainers.BpeTrainer(
+        vocab_size=vocab_size,
+        special_tokens=special_tokens,
+        min_frequency=2,
+        show_progress=True,
+    )
+    return tokenizer, trainer
 
 def _normalize_raw_line(raw_line: bytes) -> str:
     return raw_line.replace(b"\r\n", b"\n").replace(b"\r", b"\n").decode("utf-8", errors="ignore")
@@ -227,8 +245,8 @@ def main() -> None:
     args = parse_args()
 
     raw_dir = Path(args.raw_dir)
-    out_dir = Path(f"shared/data/processed/{args.dataset_name}/{args.vocab_size}_hf")
-    tok_dir = Path(f"shared/data/tokenizers/{args.dataset_name}/{args.vocab_size}_hf")
+    out_dir = Path(f"shared/data/processed/{args.dataset_name}/{args.vocab_size}_sennrich")
+    tok_dir = Path(f"shared/data/tokenizers/{args.dataset_name}/{args.vocab_size}_sennrich")
     train_txt = raw_dir / f"{args.dataset_name}_train.txt"
 
     if not train_txt.exists():
@@ -240,11 +258,11 @@ def main() -> None:
 
     print(f"vocab_size={args.vocab_size}")
     print(f"train={train_txt}")
-    print(f"regex={GPT2_PRETOKENIZER_REGEX}")
+    print("Training Sennrich BPE...")
 
-    tokenizer, trainer = build_bytelevel_bpe_tokenizer(args.vocab_size, args.special_tokens)
+    tokenizer, trainer = build_bytelevel_bpe_tokenizer2(args.vocab_size, args.special_tokens)
 
-    print("Training ByteLevel BPE...")
+    print("Training Sennrich BPE...")
     started = time.time()
     training_text = iter_training_text(str(train_txt), args.special_tokens)
     tokenizer.train_from_iterator(training_text, trainer=trainer)
@@ -254,10 +272,9 @@ def main() -> None:
     tokenizer.save(str(tokenizer_path))
     print(f"Saved tokenizer to {tokenizer_path}")
 
-    eos_id = tokenizer.token_to_id(args.special_tokens[0])
+    eos_id = tokenizer.token_to_id("<|endoftext|>")
     if eos_id is None:
-        raise ValueError(f"Special token {args.special_tokens[0]!r} was not added to the vocab")
-
+        raise ValueError("Special token '<|endoftext|>' was not added to the vocab")
     gc.collect()
 
     for split in ["train", "validation", "test"]:

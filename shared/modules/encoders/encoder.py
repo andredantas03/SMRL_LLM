@@ -4,22 +4,26 @@ import torch.nn as nn
 from shared.modules.positional_encoders.sliceawarepositionalencoding import SliceAwarePositionalEncoding
 from shared.modules.transformers_blocks.smrl_transformer_block import SMRLTransformerBlock
 from shared.tools.functions.dcttransform import DCTTransform
-
-class SMRLTransformerEncoder(nn.Module):
+import lightning as L
+class SMRLTransformerEncoder(L.LightningModule):
     """
     A full Stack of N SMRL Transformer Encoder Layers (Definition 5.10).
     """
     def __init__(self, num_layers, d, p, h, d_ff, vocab_size, T_max, 
-                 pe_strategy="linear", activation="relu", norm_first=False):
+                 pe_strategy="linear", activation="relu", norm_first=False, kind='dct', dropout=0.1):
         super().__init__()
         self.d = d
         self.p = p
         self.h = h
         self.d_s = d // p
         self.vocab_size = vocab_size
+        self.emb_dropout = nn.Dropout(dropout)
+        
+        Z = DCTTransform.get_matrix(self.p, dtype=torch.float32, kind=kind)  # ou o kind do config
+        self.register_buffer("Z", Z)
 
         # Word embeddings in standard 2D space
-        self.token_embeddings = nn.Embedding(vocab_size, d)
+        self.token_embeddings = nn.Embedding(vocab_size, d, padding_idx=0)
         
         # Folding / unfolding utilities
         self.tensorizer = EmbeddingTensorizer(p)
@@ -29,16 +33,18 @@ class SMRLTransformerEncoder(nn.Module):
 
         # Core encoder layer stack
         self.layers = nn.ModuleList([
-            SMRLTransformerBlock(d, p, h, d_ff, activation=activation, norm_first=norm_first)
+            SMRLTransformerBlock(d, p, h, d_ff, activation=activation, norm_first=norm_first, dropout=dropout)
             for _ in range(num_layers)
         ])
+    @torch.no_grad()
+    def reset_parameters(self):
+        nn.init.normal_(self.token_embeddings.weight, mean=0.0, std=0.02)
+        if self.token_embeddings.padding_idx is not None:
+            self.token_embeddings.weight[self.token_embeddings.padding_idx].zero_()
 
-    def forward(self, input_ids):
+    def forward(self, input_ids, attention_mask=None):
         B, s = input_ids.shape
         device = input_ids.device
-
-        # Get the fixed orthogonal DCT-II matrix
-        Z = DCTTransform.get_matrix(self.p, device=device, dtype=torch.float32)
 
         # 1. Standard token embeddings: (B, s, d)
         x_emb = self.token_embeddings(input_ids)
@@ -48,10 +54,11 @@ class SMRLTransformerEncoder(nn.Module):
 
         # 3. Dynamic positional encoding generation
         P = self.positional_encoding(B, s, device)
-
+        X = X + P
+        X = self.emb_dropout(X)
         # 4. Forward pass through N sequential tensor encoder blocks
         for layer in self.layers:
-            X = layer(X, P, Z)
+            X = layer(X, None, self.Z, attention_mask=attention_mask)
 
         # 5. Reconstruct standard representations: (B, s, d)
         return self.tensorizer.matp(X)

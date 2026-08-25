@@ -12,11 +12,13 @@ class Bidirectional_Multi_Head_Self_Attention(nn.Module):
         self,
         d_model: int,
         n_head: int,
-        dropout=0.0,
+        dropout=0.1,
+        use_rope=False,
     ):
         super().__init__()
         self.d_model = d_model
         self.n_head = n_head
+        assert d_model % n_head == 0, f"d_model={d_model} must be divisible by n_head={n_head}"
         self.d_head = d_model // n_head
         self.dropout = nn.Dropout(p=dropout)
 
@@ -26,7 +28,7 @@ class Bidirectional_Multi_Head_Self_Attention(nn.Module):
         self.W_O = Parameter(torch.empty((d_model, d_model)))
 
         self.reset_parameters()
-        self.rope = RotaryEmbedding(self.d_head)
+        self.rope = RotaryEmbedding(self.d_head) if use_rope else None
 
     @torch.no_grad()
     def reset_parameters(self):
@@ -47,7 +49,9 @@ class Bidirectional_Multi_Head_Self_Attention(nn.Module):
         logits = qk / (d_head**0.5)
 
         if attn_mask is not None:
-            logits = logits.masked_fill(attn_mask == 0, float("-inf"))
+            # (B, S) → (B, 1, 1, S)  (mascara keys, não linhas de query)
+            key_pad = (attn_mask == 0)[:, None, None, :]
+            logits = logits.masked_fill(key_pad, float("-inf"))
 
         attn_weights = F.softmax(logits, dim=-1)
         output = einsum(
@@ -75,18 +79,13 @@ class Bidirectional_Multi_Head_Self_Attention(nn.Module):
 
         if self.rope is not None:
             query = self.rope(query)
-            key = self.rope(key)
-
-        attn_mask = None
-        if attention_mask is not None:
-            attn_mask = attention_mask.unsqueeze(1) * attention_mask.unsqueeze(2)
-            attn_mask = attn_mask.unsqueeze(1)
+            key = self.rope(key)       
 
         attn_i = self.scaled_dot_product_attention(
             query=query,
             key=key,
             value=value,
-            attn_mask=attn_mask,
+            attn_mask=attention_mask,
         )
 
         multihead_output = rearrange(attn_i, "... h s d_k -> ... s (h d_k)")

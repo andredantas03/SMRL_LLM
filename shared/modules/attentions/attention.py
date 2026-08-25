@@ -11,7 +11,7 @@ class SMRL_Attention(nn.Module):
     Implements L-Multi-Head Attention (Algorithm 1 and 2).
     Optimized to treat the slice index as a batch dimension (Parallel implementation).
     """
-    def __init__(self, ds, p, h, causal=False):
+    def __init__(self, ds, p, h, causal=False, dropout=0.1):
         super().__init__()
         self.ds = ds
         self.p = p
@@ -22,6 +22,7 @@ class SMRL_Attention(nn.Module):
 
         # Trainable parameters stored directly in transform domain
         # Shapes: (p, ds, ds) for projection matrices within each slice
+        self.attn_drop = nn.Dropout(dropout)
         self.W_q = nn.Parameter(torch.empty(p, ds, ds))
         self.W_k = nn.Parameter(torch.empty(p, ds, ds))
         self.W_v = nn.Parameter(torch.empty(p, ds, ds))
@@ -32,7 +33,7 @@ class SMRL_Attention(nn.Module):
     def reset_parameters(self):
         # Standard initialization for projections
         for W in [self.W_q, self.W_k, self.W_v, self.W_o]:
-            nn.init.kaiming_uniform_(W, a=math.sqrt(5))
+            nn.init.normal_(W, mean=0.0, std=0.02)
 
     def forward(self, X_pos, Z, attention_mask=None):
         # 1. Transform input activations to DCT domain: (B, s, ds, p)
@@ -75,6 +76,7 @@ class SMRL_Attention(nn.Module):
         
         attn_weights = torch.softmax(scores, dim=-1)
         context = einsum(attn_weights, V_fused, "b f sq sk, b f sk dh -> b f sq dh") # (B, p * h, s, dh)
+        context = self.attn_drop(context)
 
         # 7. Unfuse dimensions and concatenate heads
         # Shape: (B, (p*h), s, dh) -> (B, p, s, h, dh) -> (B, p, s, ds)

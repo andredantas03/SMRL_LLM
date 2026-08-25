@@ -9,7 +9,7 @@ Usage (from repo root):
 """
 
 from __future__ import annotations
-
+import re
 import argparse
 import sys
 from pathlib import Path
@@ -56,7 +56,8 @@ def export_to_txt(
             if text is None:
                 skipped += 1
                 continue
-            text = str(text).strip()
+            text = re.sub(r"<br\s*/?>", " ", str(text), flags=re.I)
+            text = " ".join(text.split())
             if not text:
                 skipped += 1
                 continue

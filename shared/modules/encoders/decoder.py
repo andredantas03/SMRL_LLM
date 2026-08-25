@@ -19,7 +19,7 @@ class SMRLTransformerDecoder(L.LightningModule):
         self.d_s = d // p
         self.vocab_size = vocab_size
 
-        Z = DCTTransform.get_matrix(self.p, dtype=torch.float32, kind='dct')  # ou o kind do config
+        Z = DCTTransform.get_matrix(self.p, dtype=torch.float32, kind='haar')  # ou o kind do config
         self.register_buffer("Z", Z)
 
         # Word embeddings in standard 2D space
@@ -49,10 +49,10 @@ class SMRLTransformerDecoder(L.LightningModule):
 
         # 3. Dynamic positional encoding generation
         P = self.positional_encoding(B, s, device)
-
+        X = X + P
         # 4. Forward pass through N sequential tensor encoder blocks
         for layer in self.layers:
-            X = layer(X, P, self.Z)
+            X = layer(X, None, self.Z)
 
         # 5. Reconstruct standard representations: (B, s, d)
         return self.tensorizer.matp(X)
