@@ -29,7 +29,7 @@ def train(
     dataloaders = build_classification_dataloaders(
         processed_dataset_path=config["data_classification"]["processed_dataset_path"],
         batch_size=config["training_classification"]["batch_size"],
-        num_workers=config["data"]["num_workers"],
+        num_workers=config["data_classification"]["num_workers"],
         context_length=config["model"]["max_seq_length"],
         pad_id=config["data_classification"]["pad_id"],
     )
@@ -66,6 +66,7 @@ def train(
         test_result = trainer.test(model, dataloaders["test"])
     finally:
         wandb_logger.finalize("success")
+        wandb.finish()
 
     test_loss = None
     if test_result and isinstance(test_result[0], dict):

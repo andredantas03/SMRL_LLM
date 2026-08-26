@@ -53,7 +53,7 @@ class SMRLTransformerDecoder(L.LightningModule):
         # 4. Forward pass through N sequential tensor encoder blocks
         Z = self.orthogonal_transform.get_matrix(dtype=torch.float32)
         for layer in self.layers:
-            X = layer(X, None, Z)
+            X = layer(X, P, Z)
 
         # 5. Reconstruct standard representations: (B, s, d)
         return self.tensorizer.matp(X)

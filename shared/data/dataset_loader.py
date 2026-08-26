@@ -226,7 +226,6 @@ def build_classification_dataloaders(
         ("test", eval_bs, False),
     ):
         paths = _classification_split_paths(processed_dataset_path, split)
-        print(paths)
         if paths is None:
             continue
         docs_path, offsets_path, labels_path = paths

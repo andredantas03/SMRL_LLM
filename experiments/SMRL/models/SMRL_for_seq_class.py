@@ -53,7 +53,21 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
         return loss
     
     def training_step(self, batch, batch_idx=None):
-        return self._shared_step(batch, "train")
+        # return self._shared_step(batch, "train")
+        logits = self(batch["input_ids"], batch.get("attention_mask"))
+        ce = cross_entropy_loss(logits, batch["labels"])
+        acc = (logits.argmax(dim=-1) == batch["labels"]).float().mean()
+        loss = ce
+        if self.config["model"]["kind"] == "learnable":
+            Z = self.encoder.orthogonal_transform.get_matrix()
+            orth = self.orthogonality_penalty(Z)
+            lam = self.config["model"].get("orth_lambda", 1.0)
+            loss = ce + lam * orth
+            self.log("train_orth", orth, on_step=True, on_epoch=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train_ce", ce, on_step=False, on_epoch=True)
+        self.log("train_acc", acc, on_epoch=True, prog_bar=True)
+        return loss
     def validation_step(self, batch, batch_idx=None):
         return self._shared_step(batch, "val")
     def test_step(self, batch, batch_idx=None):
@@ -62,14 +76,20 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure=None):
         optimizer.step(closure=optimizer_closure)   
         
-        if self.config["model"]["kind"] == "learnable":
-            z = self.encoder.orthogonal_transform.learnable_z.z
-            with torch.no_grad():
-                zf = z.float()
-                Q, R = torch.linalg.qr(zf)
-                s = torch.sign(torch.diag(R))
-                s = torch.where(s == 0, torch.ones_like(s), s)
-                z.copy_(Q * s.unsqueeze(0))
+        # if self.config["model"]["kind"] == "learnable":
+        #     z = self.encoder.orthogonal_transform.learnable_z.z
+        #     with torch.no_grad():
+        #         zf = z.float()
+        #         Q, R = torch.linalg.qr(zf)
+        #         s = torch.sign(torch.diag(R))
+        #         s = torch.where(s == 0, torch.ones_like(s), s)
+        #         z.copy_(Q * s.unsqueeze(0))
     
     def configure_optimizers(self):
         return build_optimizer_and_scheduler(self, self.config)
+    
+    def orthogonality_penalty(self, Z: torch.Tensor) -> torch.Tensor:
+        # Z: (p, p)
+        I = torch.eye(Z.size(0), device=Z.device, dtype=Z.dtype)
+        gram = Z.T @ Z
+        return ((gram - I) ** 2).sum()

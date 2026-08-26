@@ -35,6 +35,8 @@ class SMRLTransformerEncoder(L.LightningModule):
             SMRLTransformerBlock(d, p, h, d_ff, activation=activation, norm_first=norm_first, dropout=dropout)
             for _ in range(num_layers)
         ])
+        self.reset_parameters()
+    
     @torch.no_grad()
     def reset_parameters(self):
         nn.init.normal_(self.token_embeddings.weight, mean=0.0, std=0.02)

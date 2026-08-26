@@ -16,7 +16,7 @@ from pathlib import Path
 
 from datasets import Dataset, DatasetDict, load_from_disk
 
-DEFAULT_EOS = "<|endoftext|>"
+DEFAULT_EOS = ""
 DEFAULT_TEXT_COLUMN = "text"
 DEFAULT_SPLIT = "train"
 
@@ -64,7 +64,6 @@ def export_to_txt(
             handle.write(text)
             handle.write("\n")
             handle.write(eos)
-            handle.write("\n")
             written += 1
 
     return written, skipped
@@ -99,6 +98,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Output .txt path. Default: <input>/<input.name>_<split>.txt",
     )
+    
     return parser.parse_args()
 
 

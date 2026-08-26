@@ -13,21 +13,24 @@ def model_loader(config):
 
 def resolve_tags_name(config):
     return [
-        config["model"]["type"],
+        f"experiment_{config['experiment']['name']}",
+        f"task_{config['experiment']['task']}",
         f"model_{config['model']['type']}",
         f"max_epochs_{config['training_classification']['max_epochs']}",
-        config["data_classification"]["processed_dataset_path"]["train_docs_path"],
+        f"dataset_{config['data_classification']['dataset_name']}",
         f"vocab_{config['model']['vocab_size']}",
         f"hidden_size_{config['model']['hidden_size']}",
         f"n_layer_{config['model']['n_layer']}",
         f"p_{config['model']['p']}",
         f"max_seq_length_{config['model']['max_seq_length']}",
         f"kind_{config['model']['kind']}",
-        f"experiment_{config['experiment']['name']}",
+        f"seed_{config['experiment']['seed']}",
+        # f"orthogonality_penalty",
+        # f"orthogonality_penalty_{config['model']['orth_lambda']}",
     ]
 
 def resolve_project_name(config):
-    return "SMRL"
+    return "SMRL_Teste_de_Sanidade"
 
 def resolve_run_name(config):
-    return "SMRL-"+config["model"]["kind"]
+    return f'SMRL_Classification_dataset_{config["data_classification"]["dataset_name"]}_kind_{config["model"]["kind"]}'

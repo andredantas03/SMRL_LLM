@@ -1,6 +1,7 @@
 experiment:
   project: "SMRL"
-  name: "attention_v1"
+  name: "Classification_Baseline"
+  task: "classification"
   seed: 42
 
 model:
@@ -11,11 +12,12 @@ model:
   d_ff: 512
   vocab_size : 30000
   max_seq_length : &max_seq_len 128
-  n_layer : 5
+  n_layer : 4
   n_head : 1
   H: 4
-  dropout : 0.1  
-  kind: 'learnable' # ['dct', 'dst', 'haar', 'dht', 'learnable']
+  dropout : 0.1
+  kind: 'dct' # ['dct', 'dst', 'haar', 'dht', 'learnable']
+  orth_lambda: 1.0
 
 training:
   max_steps: 5000
@@ -47,7 +49,7 @@ logging:
 evaluation:
   metrics: ["accuracy", "f1"]
 
-data:
+data_language_modeling:
   #dataset_name : "tinystoriesv2-gpt4"
   dataset_name : "wikitext103"
   output_raw_dir : "shared/data/raw/wikitext103"
@@ -64,7 +66,15 @@ data:
 #    test_dataset_path  : "shared/data/processed/tinystoriesv2-gpt4/30000_hf/TinyStoriesV2-GPT4-test.npy"
 
 data_classification:
+  dataset_name: "imdb"
+  num_workers : 0
   processed_dataset_path:
+    # train_docs_path: "shared/data/processed/ag_news/30000_sennrich/ag_news-train-docs.npy"
+    # train_offsets_path: "shared/data/processed/ag_news/30000_sennrich/ag_news-train-offsets.npy"
+    # train_labels_path: "shared/data/processed/ag_news/30000_sennrich/ag_news-train-labels.npy"
+    # test_docs_path: "shared/data/processed/ag_news/30000_sennrich/ag_news-test-docs.npy"
+    # test_offsets_path: "shared/data/processed/ag_news/30000_sennrich/ag_news-test-offsets.npy"
+    # test_labels_path: "shared/data/processed/ag_news/30000_sennrich/ag_news-test-labels.npy"
     train_docs_path: "shared/data/processed/imdb/30000_sennrich/imdb-train-docs.npy"
     train_offsets_path: "shared/data/processed/imdb/30000_sennrich/imdb-train-offsets.npy"
     train_labels_path: "shared/data/processed/imdb/30000_sennrich/imdb-train-labels.npy"

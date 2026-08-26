@@ -1,129 +1,35 @@
 """
-Train a ByteLevel BPE tokenizer with HuggingFace `tokenizers` and export .npy datasets.
+Encode raw .txt splits with Sennrich BPE (subword-nmt) into concatenated .npy streams.
 
-Uses the GPT-2 pretokenizer regex (same PAT as pre_tokenizing.py / Tokenizer.py),
-256 byte tokens + special tokens, and line-by-line encoding with <|endoftext|> per split.
+Expects codes.txt already produced by:
+    subword-nmt learn-bpe -s 29997 < {dataset}_train.txt > codes.txt
+
+If vocab.json is missing, it is built from the train split (specials first,
+then most frequent BPE pieces up to --vocab-size).
 
 Usage (from repo root):
-    python -m shared.data.build_dataset --vocab-size 32768
-    python -m shared.data.build_dataset --vocab-size 110592 --raw-dir shared/data/raw/wikitext103 --dataset-name wikitext103
+    python -m shared.data.build_dataset
+    python -m shared.data.build_dataset --raw-dir shared/data/raw/imdb --dataset-name imdb
 """
 
 from __future__ import annotations
 
 import argparse
 import gc
-import re
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import numpy.lib.format as npf
-from tokenizers import Regex, Tokenizer, decoders, models, pre_tokenizers, trainers
 
-# Same regex as shared/tools/utils/pre_tokenizing.py and Tokenizer.py
-GPT2_PRETOKENIZER_REGEX = (
-    r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"
-)
+from shared.data.tokenizer import CODES_NAME, VOCAB_NAME, Tokenizer
+
 DEFAULT_RAW_DIR = "shared/data/raw/imdb"
-DEFAULT_SPECIAL_TOKENS = ["[PAD]", "[UNK]", "<|endoftext|>"]
 DEFAULT_DATASET_NAME = "imdb"
 DEFAULT_VOCAB_SIZE = 30000
 ENCODE_BATCH_LINES = 256
 NPY_WRITE_CHUNK_TOKENS = 4_000_000
-
-def build_bytelevel_bpe_tokenizer(
-    vocab_size: int,
-    special_tokens: list[str],
-) -> tuple[Tokenizer, trainers.BpeTrainer]:
-    """Create a ByteLevel BPE tokenizer with the project pretokenizer regex."""
-    tokenizer = Tokenizer(models.BPE(unk_token=None))
-
-    tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
-        [
-            pre_tokenizers.Split(
-                Regex(GPT2_PRETOKENIZER_REGEX),
-                behavior="isolated",
-                invert=False,
-            ),
-            pre_tokenizers.ByteLevel(
-                add_prefix_space=False,
-                use_regex=False,
-            ),
-        ]
-    )
-    tokenizer.decoder = decoders.ByteLevel()
-
-    trainer = trainers.BpeTrainer(
-        vocab_size=vocab_size,
-        special_tokens=special_tokens,
-        min_frequency=0,
-        show_progress=True,
-        initial_alphabet=pre_tokenizers.ByteLevel.alphabet(),
-    )
-    return tokenizer, trainer
-
-def build_bytelevel_bpe_tokenizer2(
-    vocab_size: int,
-    special_tokens: list[str],
-) -> tuple[Tokenizer, trainers.BpeTrainer]:
-    tokenizer = Tokenizer(models.BPE(unk_token="[UNK]"))
-    tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
-        [
-            pre_tokenizers.Whitespace(),
-            pre_tokenizers.Punctuation(),
-        ]
-    )
-    trainer = trainers.BpeTrainer(
-        vocab_size=vocab_size,
-        special_tokens=special_tokens,
-        min_frequency=2,
-        show_progress=True,
-    )
-    return tokenizer, trainer
-
-def _normalize_raw_line(raw_line: bytes) -> str:
-    return raw_line.replace(b"\r\n", b"\n").replace(b"\r", b"\n").decode("utf-8", errors="ignore")
-
-
-def iter_training_text(path: str, special_tokens: list[str]):
-    """
-    Yield training text with the same normalization and special-token removal
-    used in parallel_pre_tokenize during custom BPE training.
-
-    Reads line-by-line and splits on special tokens incrementally so the full
-    file is never loaded into memory.
-    """
-    if not special_tokens:
-        with open(path, "rb") as handle:
-            for raw_line in handle:
-                line = _normalize_raw_line(raw_line)
-                if line:
-                    yield line
-        return
-
-    pattern = re.compile("|".join(re.escape(token) for token in special_tokens))
-    current_parts: list[str] = []
-
-    with open(path, "rb") as handle:
-        for raw_line in handle:
-            line = _normalize_raw_line(raw_line)
-            pos = 0
-            for match in pattern.finditer(line):
-                if match.start() > pos:
-                    current_parts.append(line[pos : match.start()])
-                part = "".join(current_parts)
-                if part:
-                    yield part
-                current_parts.clear()
-                pos = match.end()
-            if pos < len(line):
-                current_parts.append(line[pos:])
-
-    trailing = "".join(current_parts)
-    if trailing:
-        yield trailing
 
 
 def save_token_ids_npy(
@@ -161,6 +67,17 @@ def encode_file_to_npy(
     line_count = 0
     batch: list[str] = []
 
+    def _flush(lines: list[str], out_bin) -> None:
+        nonlocal token_count, token_min, token_max
+        for ids in tokenizer.encode_batch(lines):
+            if not ids:
+                continue
+            arr = np.asarray(ids, dtype=np.int32)
+            arr.tofile(out_bin)
+            token_count += arr.size
+            token_min = min(token_min, int(arr.min()))
+            token_max = max(token_max, int(arr.max()))
+
     try:
         with open(tmp_bin, "wb") as out_bin, open(input_path, "r", encoding="utf-8") as handle:
             for line in handle:
@@ -170,26 +87,14 @@ def encode_file_to_npy(
                 if len(batch) < batch_lines:
                     continue
 
-                for encoding in tokenizer.encode_batch(batch):
-                    arr = np.asarray(encoding.ids, dtype=np.int32)
-                    arr.tofile(out_bin)
-                    token_count += arr.size
-                    if arr.size:
-                        token_min = min(token_min, int(arr.min()))
-                        token_max = max(token_max, int(arr.max()))
+                _flush(batch, out_bin)
                 batch.clear()
 
                 if line_count % 50_000 == 0:
                     print(f"  encoded {line_count:,} lines -> {token_count:,} tokens")
 
             if batch:
-                for encoding in tokenizer.encode_batch(batch):
-                    arr = np.asarray(encoding.ids, dtype=np.int32)
-                    arr.tofile(out_bin)
-                    token_count += arr.size
-                    if arr.size:
-                        token_min = min(token_min, int(arr.min()))
-                        token_max = max(token_max, int(arr.max()))
+                _flush(batch, out_bin)
 
             eos_arr = np.array([eos_id], dtype=np.int32)
             eos_arr.tofile(out_bin)
@@ -204,15 +109,49 @@ def encode_file_to_npy(
     return token_count, token_min, token_max
 
 
+def load_or_build_tokenizer(
+    tok_dir: Path,
+    train_txt: Path,
+    vocab_size: int,
+) -> Tokenizer:
+    codes_path = tok_dir / CODES_NAME
+    vocab_path = tok_dir / VOCAB_NAME
+    if not codes_path.exists():
+        print(f"codes.txt not found: {codes_path}", file=sys.stderr)
+        print(
+            "Run: subword-nmt learn-bpe -s 29997 < "
+            f"{train_txt} > {codes_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if vocab_path.exists():
+        tokenizer = Tokenizer.from_file(tok_dir)
+        print(f"Loaded vocab ({tokenizer.vocab_size} types) from {vocab_path}")
+        return tokenizer
+
+    tokenizer = Tokenizer.from_codes(codes_path)
+    print("Building vocab.json from train...")
+    started = time.time()
+    with train_txt.open("r", encoding="utf-8") as handle:
+        tokenizer.build_vocab(handle, vocab_size=vocab_size)
+    tokenizer.save_vocab(vocab_path)
+    print(
+        f"Saved {tokenizer.vocab_size} types in "
+        f"{(time.time() - started) / 60:.1f} min -> {vocab_path}"
+    )
+    return tokenizer
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train ByteLevel BPE and export tokenized .npy datasets."
+        description="Encode splits with Sennrich BPE (codes.txt + vocab.json) to .npy."
     )
     parser.add_argument(
         "--vocab-size",
         type=int,
         default=DEFAULT_VOCAB_SIZE,
-        help=f"Final vocabulary size (default: {DEFAULT_VOCAB_SIZE})",
+        help=f"Vocab cap when building vocab.json (default: {DEFAULT_VOCAB_SIZE})",
     )
     parser.add_argument(
         "--raw-dir",
@@ -224,13 +163,7 @@ def parse_args() -> argparse.Namespace:
         "--dataset-name",
         type=str,
         default=DEFAULT_DATASET_NAME,
-        help=f"Dataset prefix for output files (default: {DEFAULT_DATASET_NAME})",
-    )
-    parser.add_argument(
-        "--special-tokens",
-        nargs="+",
-        default=DEFAULT_SPECIAL_TOKENS,
-        help="Special tokens added after the 256 byte tokens",
+        help=f"Dataset prefix for input/output files (default: {DEFAULT_DATASET_NAME})",
     )
     parser.add_argument(
         "--batch-lines",
@@ -256,25 +189,16 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     tok_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"vocab_size={args.vocab_size}")
+    print(f"vocab_size_cap={args.vocab_size}")
     print(f"train={train_txt}")
-    print("Training Sennrich BPE...")
+    print(f"codes={tok_dir / CODES_NAME}")
 
-    tokenizer, trainer = build_bytelevel_bpe_tokenizer2(args.vocab_size, args.special_tokens)
-
-    print("Training Sennrich BPE...")
-    started = time.time()
-    training_text = iter_training_text(str(train_txt), args.special_tokens)
-    tokenizer.train_from_iterator(training_text, trainer=trainer)
-    print(f"Training done in {(time.time() - started) / 60:.1f} min")
-
-    tokenizer_path = tok_dir / "tokenizer.json"
-    tokenizer.save(str(tokenizer_path))
-    print(f"Saved tokenizer to {tokenizer_path}")
-
-    eos_id = tokenizer.token_to_id("<|endoftext|>")
-    if eos_id is None:
-        raise ValueError("Special token '<|endoftext|>' was not added to the vocab")
+    tokenizer = load_or_build_tokenizer(tok_dir, train_txt, args.vocab_size)
+    eos_id = tokenizer.eos_id
+    print(
+        f"pad={tokenizer.pad_id} unk={tokenizer.unk_id} "
+        f"eos={eos_id} vocab_size={tokenizer.vocab_size}"
+    )
     gc.collect()
 
     for split in ["train", "validation", "test"]:

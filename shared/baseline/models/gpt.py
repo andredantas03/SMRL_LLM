@@ -18,7 +18,7 @@ class GPT(GradientNormLoggingMixin, L.LightningModule):
         self.vocab_size  = config['model']['vocab_size']
         self.num_layers  = config['model']['n_layer']
         self.max_seq_len = config['model']['max_seq_length']
-        self.n_head      = config['model']['n_head']
+        self.n_head      = config['model']['H']
         self.d_ff        = config['model']['d_ff']
         self.dropout     = config['model']['dropout']
         

@@ -20,7 +20,7 @@ class BertTiny(GradientNormLoggingMixin, L.LightningModule):
         self.d_model = model_cfg["hidden_size"]
         self.vocab_size = model_cfg["vocab_size"]
         self.num_layers = model_cfg["n_layer"]
-        self.n_head = model_cfg.get("H", model_cfg["n_head"])
+        self.n_head = model_cfg["H"]
         self.d_ff = model_cfg["d_ff"]
         self.dropout = model_cfg["dropout"]
         self.num_classes = config["data_classification"]["num_classes"]

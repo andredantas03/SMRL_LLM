@@ -7,10 +7,24 @@ from shared.tools.functions.learning_rate import learning_rate_schedule
 
 def build_optimizer_and_scheduler(self, config: dict):
     train = config["training"]
+    decay, no_decay = [], []
+    for name, param in self.named_parameters():
+        if name.endswith("learnable_z.z"):
+            no_decay.append(param)
+        else:
+            decay.append(param)
+    if no_decay:
+        param_groups = [
+            {"params": decay, "weight_decay": train["weight_decay"]},
+            {"params": no_decay, "weight_decay": 0.0},
+        ]
+    else:
+        param_groups = [
+            {"params": decay, "weight_decay": train["weight_decay"]},
+        ]
     optimizer = AdamW(
-        self.parameters(),
+        param_groups,
         lr=train["lr"],            # 3e-4
-        weight_decay=train["weight_decay"],
         # paper não fixa betas; 0.9/0.999 é o default do AdamW
     )
     scheduler = OneCycleLR(
