@@ -1,0 +1,55 @@
+experiment:
+  project: "SMRL"
+  name: "Classification"
+  task: "classification"
+  seed: 42
+
+model:
+  #type: 'SMRL_for_Sequence_Classification'
+  type: 'BertTiny'
+  activation: 'gelu'
+  p: 4
+  hidden_size: 128
+  d_ff: 512
+  vocab_size : 30000
+  max_seq_length : &max_seq_len 128
+  n_layer : 4
+  n_head : 1
+  H: 4
+  dropout : 0.1
+  kind: 'dct' # ['dct', 'dst', 'haar', 'dht', 'learnable']
+  orth_lambda: 1.0
+
+training:
+  lr: 3.0e-4
+  lr_min: 1.0e-5
+  weight_decay : 0.01
+  gradient_clip_val: 1.0
+  max_epochs: 20
+  batch_size: 128
+  eval_batch_size: 256
+  div_factor: 25
+  
+  # early_stopping:
+  #   monitor: val_ppl
+  #   mode: min
+  #   patience: 5
+  #   min_delta: 0.0
+  #   stopping_threshold: 40.0
+
+
+logging:
+  limit_val_batches : 200
+
+evaluation:
+  metrics: ["accuracy", "f1"]
+
+data:
+  dataset_name: "imdb"
+  num_workers : 0
+  num_classes: 2
+  pad_id: 0
+
+paths:
+  results_dir: "results/smrl/"
+  save_dir: "results/smrl/"

@@ -1,21 +1,13 @@
+import math
 from torch import nn
 from torch.nn import Parameter
 import torch
 
-class Embedding(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim, device=None, dtype=None):
-        super().__init__()
-        self.num_embeddings = num_embeddings
-        self.embedding_dim = embedding_dim
-        factory_kwargs = {"device": device, "dtype": dtype}
-        self.weight = Parameter(
-            torch.empty((self.num_embeddings, self.embedding_dim), **factory_kwargs)
-        )
-        self.reset_parameters()
+class Embeddings(nn.Module):
+    def __init__(self, d_model, vocab):
+        super(Embeddings, self).__init__()
+        self.lut = nn.Embedding(vocab, d_model)
+        self.d_model = d_model
 
-    def reset_parameters(self):
-        nn.init.trunc_normal_(self.weight, mean=0.0, std=1.0, a=-3.0, b=3.0)
-
-    def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
-        return self.weight[token_ids]
-
+    def forward(self, x):
+        return self.lut(x) * math.sqrt(self.d_model)

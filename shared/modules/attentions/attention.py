@@ -38,6 +38,10 @@ class SMRL_Attention(nn.Module):
     def forward(self, X_pos, Z, attention_mask=None):
         # 1. Transform input activations to DCT domain: (B, s, ds, p)
         X_hat = OrthogonalTransform.forward(X_pos, Z)
+        W_q_hat = einsum(Z, self.W_q, "p2 p1, p2 din dout -> p2 din dout")
+        W_k_hat = einsum(Z, self.W_k, "p2 p1, p2 din dout -> p2 din dout")
+        W_v_hat = einsum(Z, self.W_v, "p2 p1, p2 din dout -> p2 din dout")
+        W_o_hat = einsum(Z, self.W_o, "p2 p1, p2 din dout -> p2 din dout")
 
         # 2. Treat slice index as a batch dimension for GPU concurrency:
         # Permute (B, s, ds, p) -> (B, p, s, ds)
@@ -45,9 +49,9 @@ class SMRL_Attention(nn.Module):
         
         # 3. Project queries, keys, and values within each slice
         # X_hat_sliced is (B, p, s, ds), self.W_* is (p, ds, ds)
-        Q = einsum(X_hat_sliced, self.W_q, "b p s din, p din dout -> b p s dout")
-        K = einsum(X_hat_sliced, self.W_k, "b p s din, p din dout -> b p s dout")
-        V = einsum(X_hat_sliced, self.W_v, "b p s din, p din dout -> b p s dout")
+        Q = einsum(X_hat_sliced, W_q_hat, "b p s din, p din dout -> b p s dout")
+        K = einsum(X_hat_sliced, W_k_hat, "b p s din, p din dout -> b p s dout")
+        V = einsum(X_hat_sliced, W_v_hat, "b p s din, p din dout -> b p s dout")
 
         # 4. Split into h attention heads: (B, p, s, h, d_h) -> Transpose to (B, p, h, s, d_h)
         Q = rearrange(Q, "b p s (h dh) -> b p h s dh", h=self.h, dh=self.dh)
@@ -84,7 +88,7 @@ class SMRL_Attention(nn.Module):
         H = rearrange(context, "b p s h dh -> b p s (h dh)")
 
         # 8. Output projection within slice: (B, p, s, ds)
-        Y_hat_sliced = einsum(H, self.W_o, "b p s din, p din dout -> b p s dout")
+        Y_hat_sliced = einsum(H, W_o_hat, "b p s din, p din dout -> b p s dout")
 
         # 9. Form Y_hat by permuting back to frontal slices: (B, s, ds, p)
         Y_hat = rearrange(Y_hat_sliced, "b p s ds -> b s ds p")

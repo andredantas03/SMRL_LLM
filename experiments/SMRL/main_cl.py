@@ -1,8 +1,9 @@
 import argparse
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
+import torch
 from experiments.SMRL.models.SMRL_for_seq_class import SMRL_Model_for_Sequence_Classification
-from experiments.SMRL.names import model_loader, resolve_project_name, resolve_run_name, resolve_tags_name
+from experiments.SMRL.names import model_loader, resolve_kwargs_classification, resolve_project_name, resolve_run_name, resolve_tags_name
 from shared.baseline.models.bert_tiny import BertTiny
 from shared.data.dataset_loader import build_classification_dataloaders, load_config
 import warnings
@@ -18,20 +19,15 @@ def train(
     config,
     model_name: str,
 ):
-    base_seed = config.get("experiment", {}).get("seed", 42)
-    L.seed_everything(base_seed)
 
     #model = BertTiny(config=config)
     model = model_loader(config=config)
     n_params = sum(p.numel() for p in model.parameters())
+    #model = torch.compile(model)
     
 
     dataloaders = build_classification_dataloaders(
-        processed_dataset_path=config["data_classification"]["processed_dataset_path"],
-        batch_size=config["training_classification"]["batch_size"],
-        num_workers=config["data_classification"]["num_workers"],
-        context_length=config["model"]["max_seq_length"],
-        pad_id=config["data_classification"]["pad_id"],
+        **resolve_kwargs_classification(config)
     )
 
     
@@ -42,6 +38,8 @@ def train(
         job_type=model_name,
         tags=resolve_tags_name(config),
         log_model=False,
+        config=config,
+        save_dir=config["paths"]["save_dir"]+'/'+config["experiment"]["task"]+"/",
     )
 
     
@@ -49,13 +47,14 @@ def train(
     
 
     trainer_kwargs = {
-        "max_epochs": config["training_classification"]["max_epochs"],
+        "max_epochs": config["training"]["max_epochs"],
         "devices": 1,
         "accelerator": "gpu",
         "logger": wandb_logger,
-        "precision": "bf16-mixed",
-        "gradient_clip_val": config["training"].get("gradient_clip_val", 1.0),
-        "limit_val_batches": config["logging"].get("limit_val_batches", 200),
+        "precision": "16-mixed",
+        "gradient_clip_val": config["training"]["gradient_clip_val"],
+        "limit_val_batches": config["logging"]["limit_val_batches"],
+        "default_root_dir": "results/lightning",
     }
     
     trainer = L.Trainer(**trainer_kwargs)
@@ -81,10 +80,10 @@ def train(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train a single CPToken experiment.")
+    parser = argparse.ArgumentParser(description="Train a single SMRL experiment.")
     parser.add_argument(
         "--config",
-        default="experiments/SMRL/configs/default.yaml",
+        default="experiments/SMRL/configs/classification.yaml",
         help="Path to base config YAML.",
     )
     parser.add_argument(
@@ -99,4 +98,6 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     config = load_config(args.config)
+    base_seed = config.get("experiment", {}).get("seed", 42)
+    L.seed_everything(base_seed)
     train(config, args.model)

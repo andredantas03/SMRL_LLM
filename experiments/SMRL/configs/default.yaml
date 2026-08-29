@@ -7,6 +7,7 @@ experiment:
 model:
   #type: 'SMRL_for_Sequence_Classification'
   type: 'SMRL'
+  activation: 'gelu'
   p: 4
   hidden_size: 128
   d_ff: 512
@@ -37,6 +38,7 @@ training:
 training_classification:
   max_epochs: 20
   batch_size: 128
+  eval_batch_size: 256
 
 
 
@@ -86,3 +88,4 @@ data_classification:
   pad_id: 0
 paths:
   results_dir: "results/smrl/"
+  save_dir: "results/smrl/"

@@ -10,7 +10,7 @@ class SMRLTransformerEncoder(L.LightningModule):
     A full Stack of N SMRL Transformer Encoder Layers (Definition 5.10).
     """
     def __init__(self, num_layers, d, p, h, d_ff, vocab_size, T_max, 
-                 pe_strategy="linear", activation="relu", norm_first=False, kind='dct', dropout=0.1):
+                 pe_strategy="linear", activation="gelu", norm_first=False, kind='dct', dropout=0.1):
         super().__init__()
         self.d = d
         self.p = p
@@ -18,6 +18,7 @@ class SMRLTransformerEncoder(L.LightningModule):
         self.d_s = d // p
         self.vocab_size = vocab_size
         self.emb_dropout = nn.Dropout(dropout)
+        
         self.orthogonal_transform = OrthogonalTransform(p,kind)
         
 
@@ -59,6 +60,7 @@ class SMRLTransformerEncoder(L.LightningModule):
         X = self.emb_dropout(X)
         # 4. Forward pass through N sequential tensor encoder blocks
         Z = self.orthogonal_transform.get_matrix(dtype=torch.float32)
+        
         for layer in self.layers:
             X = layer(X, None, Z, attention_mask=attention_mask)
 

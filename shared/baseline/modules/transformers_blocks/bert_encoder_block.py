@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch import Tensor
 
-from ..feed_forwards.feedforward import PositionwiseFFN
+from ..feed_forwards.feedforward import PositionwiseFeedForward
 from ..attentions.bidirectional_attention import Bidirectional_Multi_Head_Self_Attention
 
 
@@ -21,7 +21,7 @@ class BertEncoder_Block(nn.Module):
             dropout=self.dropout,
             use_rope=False,
         )
-        self.ffn = PositionwiseFFN(
+        self.ffn = PositionwiseFeedForward(
             d_model=self.d_model,
             d_ff=self.d_ff,
             dropout=self.dropout,

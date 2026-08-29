@@ -10,4 +10,4 @@ class LearnableZ(nn.Module):
         self.reset_parameters()
     
     def reset_parameters(self):
-        torch.nn.init.orthogonal_(self.z)
+        torch.nn.init.normal_(self.z,mean=0.0,std=0.01)

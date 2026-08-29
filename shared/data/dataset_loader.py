@@ -1,6 +1,7 @@
 #from datasets import load_dataset, load_from_disk, DatasetDict
 #from datasets import Dataset as DS
 import os
+from pathlib import Path
 import yaml
 #from transformers import AutoTokenizer
 from torch.utils.data import IterableDataset, Dataset, DataLoader, Subset
@@ -110,7 +111,7 @@ class DataModule(LightningDataModule):
 
 
 
-def load_config(config_path: str = "configs.yaml") -> dict:
+def load_config(config_path: str = "experiments/SMRL/configs/classification.yaml") -> dict:
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
@@ -196,26 +197,32 @@ def build_dataloaders(
     return dataloaders
 
 def _classification_split_paths(processed_dataset_path, split: str):
-    prefix = processed_dataset_path.get(f"{split}_prefix")
-    if prefix:
-        return f"{prefix}-docs.npy", f"{prefix}-offsets.npy", f"{prefix}-labels.npy"
-    docs = processed_dataset_path.get(f"{split}_docs_path")
-    offsets = processed_dataset_path.get(f"{split}_offsets_path")
-    labels = processed_dataset_path.get(f"{split}_labels_path")
-    if docs and offsets and labels:
-        return docs, offsets, labels
-    return None
+    if isinstance(processed_dataset_path, (str, Path)):
+        root = Path(processed_dataset_path)
+        name = root.parent.name  # "imdb"
+        prefix = root / f"{name}-{split}"
+        docs, offsets, labels = (
+            prefix.with_name(prefix.name + "-docs.npy"),
+            prefix.with_name(prefix.name + "-offsets.npy"),
+            prefix.with_name(prefix.name + "-labels.npy"),
+        )
+        if docs.exists() and offsets.exists() and labels.exists():
+            return str(docs), str(offsets), str(labels)
+        return None
 
 def build_classification_dataloaders(
-    processed_dataset_path,
-    context_length,
-    batch_size: int,
-    shuffle_train: bool = True,
-    eval_batch_size: int | None = None,
-    pad_id: int = 0,
-    num_workers: int = 0,
     pin_memory: bool = False,
+    **kwargs,
 ):
+    processed_dataset_path = kwargs["processed_dataset_path"]
+    context_length = kwargs["context_length"]
+    batch_size = kwargs["batch_size"]
+    shuffle_train = kwargs.get("shuffle_train", True)
+    eval_batch_size = kwargs["eval_batch_size"]
+    pad_id = kwargs["pad_id"]
+    num_workers = kwargs["num_workers"]
+    pin_memory = kwargs.get("pin_memory", False)
+
     eval_bs = eval_batch_size if eval_batch_size is not None else batch_size
     
     dataloaders = {}

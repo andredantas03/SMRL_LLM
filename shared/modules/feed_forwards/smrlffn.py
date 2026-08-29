@@ -1,6 +1,8 @@
+from einops import einsum
 import torch.nn as nn
 import torch
 import math
+from shared.tools.functions import l_product
 from shared.tools.functions.orthogonaltransform import OrthogonalTransform
 
 class SMRLFFN(nn.Module):
@@ -8,7 +10,7 @@ class SMRLFFN(nn.Module):
     Implements L-Feed-Forward Network (Definition 5.5 / Theorem 5.6).
     Applies standard FFNs independently to each transform-domain slice.
     """
-    def __init__(self, ds, d_ff_s, p, activation="relu", dropout=0.1):
+    def __init__(self, ds, d_ff_s, p, activation="gelu", dropout=0.1):
         super().__init__()
         self.ds = ds
         self.d_ff_s = d_ff_s
@@ -38,22 +40,12 @@ class SMRLFFN(nn.Module):
 
     def forward(self, X, Z):
         # 1. Transform activations to spectral domain: (B, T, ds, p)
-        X_hat = OrthogonalTransform.forward(X, Z)
-
-        # 2. Reshape to treat slice mode as batch: (B, p, T, ds)
-        X_hat_sliced = X_hat.permute(0, 3, 1, 2)
-
-        # 3. Apply first linear layer: H = X_hat * W1 + b1
-        # unsqueeze(0) transforms (p, 1, d_ff_s) to (1, p, 1, d_ff_s) to broadcast over Batch size B
-        H = torch.einsum('b p t s, p s f -> b p t f', X_hat_sliced, self.W1) + self.b1.unsqueeze(0)
+        H = l_product(X,self.W1,Z)
 
         # 4. Element-wise non-linearity
         G = self.act(H)
         G = self.drop(G)
         # 5. Apply second linear layer: Y = G * W2 + b2
         # unsqueeze(0) transforms (p, 1, ds) to (1, p, 1, ds) to broadcast over Batch size B
-        Y_hat_sliced = torch.einsum('b p t f, p f s -> b p t s', G, self.W2) + self.b2.unsqueeze(0)
-
-        # 6. Permute back and transform to original domain
-        Y_hat = Y_hat_sliced.permute(0, 2, 3, 1).contiguous()
-        return OrthogonalTransform.inverse(Y_hat, Z)
+        Y = l_product(G,self.W2,Z) + self.b2.unsqueeze(0)        
+        return Y

@@ -12,6 +12,7 @@ shared/data/raw/
 shared/data/processed/
 shared/data/tokenizers/
 teste-smrl/
+results/
 *.pdf
 *.npy
 *.ipynb

@@ -11,9 +11,10 @@ from shared.tools.utils.sweep import apply_overrides
 
 
 PARAMETERS = {
-    "model.type": ["SMRL"],
-    "experiment.seed": [42],
-    "model.kind": ['dct'],
+    "model.type": ["BertTiny"],
+    "experiment.seed": [42,123,7],
+    # "model.kind": ['learnable'],
+    # "model.orth_lambda" : [0.0, 0.1, 0.5, 1.0, 2.0, 5.0]   
 }
 
 
@@ -21,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Sweep SMRL classification configs in-memory.")
     parser.add_argument(
         "--config",
-        default="experiments/SMRL/configs/default.yaml",
+        default="experiments/SMRL/configs/classification.yaml",
         help="Base YAML loaded once via load_config.",
     )
     return parser.parse_args()

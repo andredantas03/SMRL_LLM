@@ -29,11 +29,12 @@ def build_optimizer_and_scheduler(self, config: dict):
     )
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=train["lr"],
         total_steps=self.trainer.estimated_stepping_batches,
+        max_lr=train["lr"],
         pct_start=0.1,
+        div_factor = 25,
         anneal_strategy="cos",
-        final_div_factor=train["lr"] / train["lr_min"],  # 3e-4 / 1e-5 = 30
+        final_div_factor=(train["lr"] / train["div_factor"])/train["lr_min"],  # 3e-4 / 1e-5 = 30
     )
     return {
         "optimizer": optimizer,

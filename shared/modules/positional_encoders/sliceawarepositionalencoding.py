@@ -37,23 +37,26 @@ class SliceAwarePositionalEncoding(nn.Module):
 
         # Compute base sinusoidal components
         pe = torch.zeros(s_max, ds, p)
-        # 10000^(2 * floor(j/2) / ds)
-        div_term = torch.exp(torch.arange(0, ds, 2).float() * -(math.log(10000.0) / ds)) # (ds // 2)
         
-        self.register_buffer("div_term", div_term)
+        j = torch.arange(1, ds + 1).float()         # paper: j = 1..ds
+        expo = 2.0 * torch.floor((j - 1) / 2.0) / ds
+        div = 1/(10000.0 ** expo)
+        self.register_buffer("div_term", div)
         self.register_buffer("pe_template", pe)
 
     def forward(self, batch_size, s, device):
         # We compute the slice-aware positional encoding dynamically up to seq length s
         pe = torch.zeros(s, self.ds, self.p, device=device, dtype=self.alpha.dtype)
-        t = torch.arange(s, device=device, dtype=self.alpha.dtype).unsqueeze(1) # (s, 1)
+        t = torch.arange(1,s+1, device=device, dtype=self.alpha.dtype).unsqueeze(1) # (s, 1)
 
         # Iterate over slices to apply alpha_k frequency scaling
         for k in range(self.p):
             scaled_t = t * self.alpha[k]
             # Even indices use sine, odd indices use cosine
-            pe[:, 0::2, k] = torch.sin(scaled_t * self.div_term)
-            pe[:, 1::2, k] = torch.cos(scaled_t * self.div_term)
+            arg = scaled_t * self.div_term   # (s, 1) * (ds,) → (s, ds)
+            pe[:, 0::2, k] = torch.sin(arg[:, 0::2])
+            pe[:, 1::2, k] = torch.cos(arg[:, 1::2])
+            
 
         # Expand to batch dimension: (B, s, ds, p)
         return pe.unsqueeze(0).expand(batch_size, -1, -1, -1)

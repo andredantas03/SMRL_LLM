@@ -11,7 +11,7 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
     A complete sequence classification model using the Tensor Transformer Encoder.
     """
     def __init__(self, config,
-                 pe_strategy="standard", activation="gelu", norm_first=False):
+                 pe_strategy="standard", activation="relu", norm_first=False):
         super().__init__()
         self.config = config
         self.encoder = SMRLTransformerEncoder(
@@ -24,7 +24,7 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
             T_max=config["model"]["max_seq_length"],
             kind=config["model"]["kind"],
             pe_strategy=pe_strategy,
-            activation=activation,
+            activation=config["model"]["activation"],
             norm_first=norm_first,
             dropout=config["model"]["dropout"]
         )
@@ -33,7 +33,14 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
             config["model"]["hidden_size"],
             config["data_classification"]["num_classes"],
         )
+        self.reset_parameters()
 
+    @torch.no_grad()
+    def reset_parameters(self):
+        d = self.config["model"]["hidden_size"]
+        nn.init.normal_(self.classifier.weight, mean=0.0, std=d ** -0.5)
+        nn.init.zeros_(self.classifier.bias)
+    
     def forward(self, input_ids, attention_mask=None):
         hidden = self.encoder(input_ids, attention_mask=attention_mask)
         if attention_mask is None:
@@ -54,19 +61,17 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
     
     def training_step(self, batch, batch_idx=None):
         # return self._shared_step(batch, "train")
-        logits = self(batch["input_ids"], batch.get("attention_mask"))
+        logits = self(batch["input_ids"], batch["attention_mask"])
         ce = cross_entropy_loss(logits, batch["labels"])
         acc = (logits.argmax(dim=-1) == batch["labels"]).float().mean()
         loss = ce
         if self.config["model"]["kind"] == "learnable":
             Z = self.encoder.orthogonal_transform.get_matrix()
             orth = self.orthogonality_penalty(Z)
-            lam = self.config["model"].get("orth_lambda", 1.0)
+            lam = self.config["model"]["orth_lambda"]
             loss = ce + lam * orth
             self.log("train_orth", orth, on_step=True, on_epoch=True)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train_ce", ce, on_step=False, on_epoch=True)
-        self.log("train_acc", acc, on_epoch=True, prog_bar=True)
         return loss
     def validation_step(self, batch, batch_idx=None):
         return self._shared_step(batch, "val")
