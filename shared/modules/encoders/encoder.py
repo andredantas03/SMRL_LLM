@@ -1,3 +1,4 @@
+import math
 from shared.tools.functions.embedding_tensorizer import EmbeddingTensorizer
 import torch
 import torch.nn as nn
@@ -9,8 +10,8 @@ class SMRLTransformerEncoder(L.LightningModule):
     """
     A full Stack of N SMRL Transformer Encoder Layers (Definition 5.10).
     """
-    def __init__(self, num_layers, d, p, h, d_ff, vocab_size, T_max, 
-                 pe_strategy="linear", activation="gelu", norm_first=False, kind='dct', dropout=0.1):
+    def __init__(self, num_layers, d, p, h, d_ff, vocab_size, T_max, kind, activation,
+                 pe_strategy="linear", norm_first=False, dropout=0.1):
         super().__init__()
         self.d = d
         self.p = p
@@ -40,16 +41,18 @@ class SMRLTransformerEncoder(L.LightningModule):
     
     @torch.no_grad()
     def reset_parameters(self):
-        nn.init.normal_(self.token_embeddings.weight, mean=0.0, std=0.02)
-        if self.token_embeddings.padding_idx is not None:
-            self.token_embeddings.weight[self.token_embeddings.padding_idx].zero_()
+        pass
+        # nn.init.trunc_normal_(self.token_embeddings.weight, mean=0.0, std=0.02, a=-0.04, b=0.04)
+
+        # if self.token_embeddings.padding_idx is not None:
+        #     self.token_embeddings.weight[self.token_embeddings.padding_idx].zero_()
 
     def forward(self, input_ids, attention_mask=None):
         B, s = input_ids.shape
         device = input_ids.device
 
         # 1. Standard token embeddings: (B, s, d)
-        x_emb = self.token_embeddings(input_ids)
+        x_emb = self.token_embeddings(input_ids)*math.sqrt(self.d)
 
         # 2. Reshape/fold embeddings to tensor space: (B, s, ds, p)
         X = self.tensorizer.tenp(x_emb)

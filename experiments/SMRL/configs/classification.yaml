@@ -6,12 +6,12 @@ experiment:
 
 model:
   #type: 'SMRL_for_Sequence_Classification'
-  type: 'BertTiny'
+  type: 'SMRL'
   activation: 'gelu'
   p: 4
   hidden_size: 128
   d_ff: 512
-  vocab_size : 30000
+  vocab_size : 30196
   max_seq_length : &max_seq_len 128
   n_layer : 4
   n_head : 1
@@ -39,13 +39,15 @@ training:
 
 
 logging:
-  limit_val_batches : 200
+  limit_val_batches : 1.0
 
 evaluation:
   metrics: ["accuracy", "f1"]
 
 data:
   dataset_name: "imdb"
+  vocab_path:  "shared/data/processed/imdb/30000_sennrich/hf/vocab.txt"
+  processed_path: "shared/data/processed/imdb/30000_sennrich/hf"
   num_workers : 0
   num_classes: 2
   pad_id: 0

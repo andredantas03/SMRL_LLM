@@ -24,13 +24,7 @@ class Bidirectional_Multi_Head_Self_Attention(nn.Module):
         self.W_V = nn.Linear(d_model, d_model,bias=True)
         self.W_O = nn.Linear(d_model, d_model,bias=True)
 
-        self.reset_parameters()
-
-    @torch.no_grad()
-    def reset_parameters(self):
-        std = 0.02
-        for layer in (self.W_Q, self.W_K, self.W_V, self.W_O):
-            nn.init.normal_(layer.weight, mean=0.0, std=std)
+        
 
     def scaled_dot_product_attention(self, query, key, value, attn_mask=None):
         *_, d_head = query.shape

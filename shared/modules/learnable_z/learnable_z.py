@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from shared.data.dataset_loader import load_config
+from shared.tools.utils.load_config import load_config
 
 
 class LearnableZ(nn.Module):

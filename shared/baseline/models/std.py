@@ -10,7 +10,7 @@ from shared.tools.utils.gradient_monitoring import GradientNormLoggingMixin
 from shared.baseline.modules.transformers_blocks.bert_encoder_block import BertEncoder_Block
 
 
-class BertTiny(GradientNormLoggingMixin, L.LightningModule):
+class Std( L.LightningModule):
     """Paper Std: vanilla Transformer encoder, Post-LN, sinusoidal PE, mean-pool + linear."""
 
     def __init__(self, config, *args, **kwargs):
@@ -30,6 +30,7 @@ class BertTiny(GradientNormLoggingMixin, L.LightningModule):
         self.token_embeddings = nn.Embedding(
             self.vocab_size, self.d_model, padding_idx=pad_id
         )
+        #nn.init.xavier_uniform_(self.token_embeddings.weight)
         self.positional_encoding = SinusoidalPositionalEncoding(
             max_len=model_cfg["max_seq_length"],
             d_model=self.d_model,
@@ -43,7 +44,7 @@ class BertTiny(GradientNormLoggingMixin, L.LightningModule):
                     n_head=self.n_head,
                     d_ff=self.d_ff,
                     dropout=self.dropout,
-                    activation="relu",
+                    activation=model_cfg['activation'],
                 )
                 for i in range(self.num_layers)
             }
@@ -51,11 +52,13 @@ class BertTiny(GradientNormLoggingMixin, L.LightningModule):
 
         self.classifier = nn.Linear(self.d_model, self.num_classes)
         
+        
 
     def forward(self, input_ids, attention_mask):
-        x = self.emb_dropout(self.layer_norm(self.positional_encoding(self.token_embeddings(input_ids)*math.sqrt(self.d_model))))
+        x = self.emb_dropout(self.positional_encoding(self.token_embeddings(input_ids)*math.sqrt(self.d_model)))
         for i in range(self.num_layers):
             x = self.transformer_blocks[f"block_{i}"](x, attention_mask=attention_mask)
+        #x = self.layer_norm(x)
         mask = attention_mask.unsqueeze(-1).to(x.dtype)
         pooled = (x * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1)
         return self.classifier(pooled)

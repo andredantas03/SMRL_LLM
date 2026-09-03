@@ -3,9 +3,9 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 import torch
 from experiments.SMRL.models.SMRL_for_seq_class import SMRL_Model_for_Sequence_Classification
-from experiments.SMRL.names import model_loader, resolve_kwargs_classification, resolve_project_name, resolve_run_name, resolve_tags_name
-from shared.baseline.models.bert_tiny import BertTiny
-from shared.data.dataset_loader import build_classification_dataloaders, load_config
+from experiments.SMRL.names import model_loader, resolve_project_name, resolve_run_name, resolve_tags_name
+from shared.data.class_dataset_loader import build_class_dataloaders
+from shared.tools.utils.load_config import load_config
 import warnings
 import wandb
 
@@ -26,9 +26,10 @@ def train(
     #model = torch.compile(model)
     
 
-    dataloaders = build_classification_dataloaders(
-        **resolve_kwargs_classification(config)
-    )
+    #dataloaders = build_classification_dataloaders(
+    #     **resolve_kwargs_classification(config)
+    # )
+    dataloaders = build_class_dataloaders(config)
 
     
 
@@ -50,7 +51,7 @@ def train(
         "max_epochs": config["training"]["max_epochs"],
         "devices": 1,
         "accelerator": "gpu",
-        "logger": wandb_logger,
+        #"logger": wandb_logger,
         "precision": "16-mixed",
         "gradient_clip_val": config["training"]["gradient_clip_val"],
         "limit_val_batches": config["logging"]["limit_val_batches"],

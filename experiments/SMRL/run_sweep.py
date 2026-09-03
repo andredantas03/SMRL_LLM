@@ -11,7 +11,7 @@ from shared.tools.utils.sweep import apply_overrides
 
 
 PARAMETERS = {
-    "model.type": ["BertTiny"],
+    "model.type": ["SMRL"],
     "experiment.seed": [42,123,7],
     # "model.kind": ['learnable'],
     # "model.orth_lambda" : [0.0, 0.1, 0.5, 1.0, 2.0, 5.0]   

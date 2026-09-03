@@ -1,17 +1,25 @@
+from einops import einsum, rearrange
 import torch
 
-def facewise_product(A,B):
-    assert A.shape[1] == B.shape[0]
-    assert A.shape[2] == B.shape[2]
-    return torch.einsum("mlp,lnp->mnp",A,B)
+def l_transform(A, Z):
+    Y = einsum(A, Z, '... t d p, q p ->... t d q')
+    return Y
 
-def l_product(A,B,Z):
-    assert A.shape[1] == B.shape[0]
-    assert A.shape[2] == B.shape[2]
-    assert Z.shape[0] == A.shape[1]
-    assert Z.shape[1] == B.shape[1]
-    A_hat = torch.einsum("mlp,pq->mnq",A,Z)
-    B_hat = torch.einsum("mlp,pq->mnq",B,Z)
-    C_hat = facewise_product(A_hat,B_hat)
-    C = torch.einsum("mnp,pq->mnq",C_hat,Z.T)
+def l_transform_inverse(A, Z):
+    Y = einsum(A, Z.T, '... t d p, q p ->... t d q')
+    return Y
+
+def facewise_product(A, B):
+    C = einsum(A, B, '... m l p, l n p -> ... m n p')
     return C
+
+def l_product(A, W, Z):
+    A_hat = l_transform(A, Z)
+    W_hat = l_transform(W, Z)
+    C = facewise_product(A_hat, W_hat)
+    C = l_transform_inverse(C, Z)
+    return C
+    
+    
+    
+        

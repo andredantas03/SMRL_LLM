@@ -31,15 +31,15 @@ class SMRL_Model_for_Sequence_Classification(L.LightningModule):
         # Sequence classification classifier head
         self.classifier = nn.Linear(
             config["model"]["hidden_size"],
-            config["data_classification"]["num_classes"],
+            config["data"]["num_classes"],
         )
         self.reset_parameters()
 
     @torch.no_grad()
     def reset_parameters(self):
-        d = self.config["model"]["hidden_size"]
-        nn.init.normal_(self.classifier.weight, mean=0.0, std=d ** -0.5)
-        nn.init.zeros_(self.classifier.bias)
+        pass
+        # nn.init.normal_(self.classifier.weight, mean=0.0, std=d ** -0.5)
+        # nn.init.zeros_(self.classifier.bias)
     
     def forward(self, input_ids, attention_mask=None):
         hidden = self.encoder(input_ids, attention_mask=attention_mask)

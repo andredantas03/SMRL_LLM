@@ -57,6 +57,5 @@ class SliceAwarePositionalEncoding(nn.Module):
             pe[:, 0::2, k] = torch.sin(arg[:, 0::2])
             pe[:, 1::2, k] = torch.cos(arg[:, 1::2])
             
-
         # Expand to batch dimension: (B, s, ds, p)
         return pe.unsqueeze(0).expand(batch_size, -1, -1, -1)

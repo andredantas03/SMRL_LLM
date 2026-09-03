@@ -10,9 +10,10 @@ shared/data/raw/
 *Zone.Identifier
 *:Zone.Identifier
 shared/data/processed/
-shared/data/tokenizers/
+shared/data/
 teste-smrl/
 results/
 *.pdf
 *.npy
 *.ipynb
+lixo/
